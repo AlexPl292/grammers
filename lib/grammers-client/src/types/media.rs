@@ -10,11 +10,32 @@ use crate::Client;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use grammers_tl_types as tl;
 use std::fmt::Debug;
+use std::path::Path;
+use std::io;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Photo {
     photo: tl::types::MessageMediaPhoto,
     client: Client,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Geo {
+    geo: tl::types::MessageMediaGeo,
+    client: Client,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct GeoLive {
+    geo: tl::types::MessageMediaGeoLive,
+    client: Client,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct GeoPoint {
+    pub longitude: f64,
+    pub latitude: f64,
+    pub accuracy_radius: Option<i32>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -47,6 +68,8 @@ pub enum Media {
     Document(Document),
     Sticker(Sticker),
     Contact(Contact),
+    Geo(Geo),
+    GeoLive(GeoLive),
 }
 
 impl Photo {
@@ -101,12 +124,15 @@ impl Photo {
         }
     }
 
-    pub fn id(&self) -> i64 {
+    /// Get photo id.
+    ///
+    /// Photo id may be missing in case of expired photo.
+    pub fn id(&self) -> Option<i64> {
         use tl::enums::Photo as P;
 
-        match self.photo.photo.as_ref().unwrap() {
-            P::Empty(photo) => photo.id,
-            P::Photo(photo) => photo.id,
+        match self.photo.photo.as_ref()? {
+            P::Empty(photo) => Some(photo.id),
+            P::Photo(photo) => Some(photo.id),
         }
     }
 
@@ -208,6 +234,67 @@ impl Document {
                 })
                 .unwrap_or(""),
         }
+    }
+
+    pub async fn download(&mut self, path: &Path) -> Result<(), io::Error> {
+        match &self.document.document {
+            Some(_) => {
+                if let Some(location) = self.to_input_location() {
+                    self.client.download_media_at_location(location, path).await
+                } else {
+                    Ok(())
+                }
+            }
+            None => Ok(()),
+        }
+    }
+
+    pub fn is_round_message(&self) -> bool {
+        self.document
+            .document
+            .as_ref()
+            .and_then(|p| match p {
+                tl::enums::Document::Empty(_) => Some(false),
+                tl::enums::Document::Document(doc) => {
+                    Some(doc.attributes.iter().any(|x| match x {
+                        tl::enums::DocumentAttribute::Video(attr) => match attr {
+                            tl::types::DocumentAttributeVideo {
+                                round_message,
+                                supports_streaming: _,
+                                duration: _,
+                                w: _,
+                                h: _,
+                            } => *round_message,
+                        },
+                        _ => false,
+                    }))
+                }
+            })
+            .unwrap_or(false)
+    }
+
+    pub fn is_voice_message(&self) -> bool {
+        self.document
+            .document
+            .as_ref()
+            .and_then(|p| match p {
+                tl::enums::Document::Empty(_) => Some(false),
+                tl::enums::Document::Document(doc) => {
+                    Some(doc.attributes.iter().any(|x| match x {
+                        tl::enums::DocumentAttribute::Audio(attr) => match attr {
+                            tl::types::DocumentAttributeAudio {
+                                voice,
+                                duration: _,
+                                title: _,
+                                performer: _,
+                                waveform: _,
+                            } => *voice,
+                        },
+                        _ => false,
+                    }))
+                }
+            })
+            .unwrap_or(false)
     }
 
     /// Get the file's MIME type, if any.
@@ -327,6 +414,52 @@ impl Uploaded {
     }
 }
 
+impl Geo {
+    pub(crate) fn from_media(geo: tl::types::MessageMediaGeo, client: Client) -> Self {
+        Self { geo, client }
+    }
+
+    pub fn point(&self) -> Option<GeoPoint> {
+        match &self.geo.geo {
+            tl::enums::GeoPoint::Point(point) => Some(GeoPoint {
+                latitude: point.lat,
+                longitude: point.long,
+                accuracy_radius: point.accuracy_radius,
+            }),
+            tl::enums::GeoPoint::Empty => None,
+        }
+    }
+}
+
+impl GeoLive {
+    pub(crate) fn from_media(geo: tl::types::MessageMediaGeoLive, client: Client) -> Self {
+        Self { geo, client }
+    }
+
+    pub fn point(&self) -> Option<GeoPoint> {
+        match &self.geo.geo {
+            tl::enums::GeoPoint::Point(point) => Some(GeoPoint {
+                latitude: point.lat,
+                longitude: point.long,
+                accuracy_radius: point.accuracy_radius,
+            }),
+            tl::enums::GeoPoint::Empty => None,
+        }
+    }
+
+    pub fn heading(&self) -> Option<i32> {
+        self.geo.heading
+    }
+
+    pub fn proximity_notification_radius(&self) -> Option<i32> {
+        self.geo.proximity_notification_radius
+    }
+
+    pub fn period(&self) -> i32 {
+        self.geo.period
+    }
+}
+
 impl Media {
     pub(crate) fn from_raw(media: tl::enums::MessageMedia, client: Client) -> Option<Self> {
         use tl::enums::MessageMedia as M;
@@ -335,7 +468,7 @@ impl Media {
         match media {
             M::Empty => None,
             M::Photo(photo) => Some(Self::Photo(Photo::from_media(photo, client))),
-            M::Geo(_) => None,
+            M::Geo(geo) => Some(Self::Geo(Geo::from_media(geo, client))),
             M::Contact(contact) => Some(Self::Contact(Contact::from_media(contact))),
             M::Unsupported => None,
             M::Document(document) => {
@@ -350,7 +483,7 @@ impl Media {
             M::Venue(_) => None,
             M::Game(_) => None,
             M::Invoice(_) => None,
-            M::GeoLive(_) => None,
+            M::GeoLive(geo) => Some(Self::GeoLive(GeoLive::from_media(geo, client))),
             M::Poll(_) => None,
             M::Dice(_) => None,
         }
@@ -362,6 +495,8 @@ impl Media {
             Media::Document(document) => document.to_input_media().into(),
             Media::Sticker(sticker) => sticker.document.to_input_media().into(),
             Media::Contact(contact) => contact.to_input_media().into(),
+            Media::Geo(_) => panic!("Unexpected"),
+            Media::GeoLive(_) => panic!("Unexpected"),
         }
     }
 
@@ -371,6 +506,8 @@ impl Media {
             Media::Document(document) => document.to_input_location(),
             Media::Sticker(sticker) => sticker.document.to_input_location(),
             Media::Contact(_) => None,
+            Media::Geo(_) => None,
+            Media::GeoLive(_) => None,
         }
     }
 }

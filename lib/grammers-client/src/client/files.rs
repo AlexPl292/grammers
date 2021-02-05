@@ -35,7 +35,7 @@ impl DownloadIter {
     }
 
     fn new_from_location(client: &Client, location: tl::enums::InputFileLocation) -> Self {
-        DownloadIter::new_from_file_location(client, location)
+        DownloadIter::new_from_file_location(client, location.into())
     }
 
     fn new_from_file_location(client: &Client, location: tl::enums::InputFileLocation) -> Self {

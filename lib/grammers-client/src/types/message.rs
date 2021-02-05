@@ -5,6 +5,7 @@
 // <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
+use crate::types::media::Document;
 use crate::types::{InputMessage, Media, Photo};
 use crate::utils;
 use crate::ChatMap;
@@ -489,6 +490,14 @@ impl Message {
     pub fn photo(&self) -> Option<Photo> {
         if let Media::Photo(photo) = self.media()? {
             return Some(photo);
+        }
+
+        None
+    }
+
+    pub fn document(&self) -> Option<Document> {
+        if let Media::Document(document) = self.media()? {
+            return Some(document);
         }
 
         None

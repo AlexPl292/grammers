@@ -148,6 +148,16 @@ impl MessageIter {
         )
     }
 
+    pub fn offset_date(mut self, offset_date: i32) -> Self {
+        self.request.offset_date = offset_date;
+        self
+    }
+
+    pub fn offset_id(mut self, offset_id: i32) -> Self {
+        self.request.offset_id = offset_id;
+        self
+    }
+
     /// Determines how many messages there are in total.
     ///
     /// This only performs a network call if `next` has not been called before.

@@ -7,8 +7,8 @@
 // except according to those terms.
 use std::path::Path;
 
-use tokio::fs;
 use tokio::io::AsyncWriteExt;
+use tokio::{fs, io};
 
 use grammers_tl_types as tl;
 
@@ -95,11 +95,9 @@ impl PhotoSize {
     ///   message.photo().unwrap().thumbs().largest().unwrap().download(location).await;
     /// }
     /// ```
-    pub async fn download<P: AsRef<Path>>(&self, path: P) {
+    pub async fn download<P: AsRef<Path>>(&self, path: P) -> Result<(), io::Error> {
         match self {
-            PhotoSize::Empty(_) => {
-                fs::File::create(path).await.unwrap();
-            }
+            PhotoSize::Empty(_) => fs::File::create(path).await.map(|_| ()),
             PhotoSize::Size(size) => {
                 let input_location = tl::types::InputPhotoFileLocation {
                     id: size.id,
@@ -111,17 +109,16 @@ impl PhotoSize {
                     .clone()
                     .download_media_at_location(input_location.into(), path)
                     .await
-                    .unwrap();
             }
             PhotoSize::Cached(size) => {
                 let mut file = fs::File::create(path).await.unwrap();
-                file.write(&size.bytes).await.unwrap();
+                file.write(&size.bytes).await.map(|_| ())
             }
             PhotoSize::Stripped(size) => {
                 // Based on https://core.tlgr.org/api/files#stripped-thumbnails
                 let bytes = &size.bytes;
                 if bytes.len() < 3 || bytes[0] != 0x01 {
-                    return;
+                    return Ok(());
                 }
 
                 let header = vec![
@@ -184,10 +181,11 @@ impl PhotoSize {
                 real.append(&mut footer);
 
                 let mut file = fs::File::create(path).await.unwrap();
-                file.write(&real).await.unwrap();
+                file.write(&real).await.map(|_| ())
             }
             PhotoSize::Progressive(_) => {
                 // Nothing
+                Ok(())
             }
             PhotoSize::Path(size) => {
                 // Based on https://core.tlgr.org/api/files#vector-thumbnails
@@ -216,9 +214,9 @@ impl PhotoSize {
                     path
                 );
                 let mut file = fs::File::create(path).await.unwrap();
-                file.write(res.as_bytes()).await.unwrap();
+                file.write(res.as_bytes()).await.map(|_| ())
             }
-        };
+        }
     }
 
     pub fn photo_type(&self) -> String {
