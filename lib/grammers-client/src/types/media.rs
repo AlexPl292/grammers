@@ -59,6 +59,24 @@ impl Document {
         }
     }
 
+    pub fn name(&self) -> Option<String> {
+        self.document.document.as_ref().and_then(|p| match p {
+            tl::enums::Document::Empty(_) => None,
+            tl::enums::Document::Document(doc) => doc
+                .attributes
+                .iter()
+                .filter_map(|x| match x {
+                    tl::enums::DocumentAttribute::Filename(attr) => match attr {
+                        tl::types::DocumentAttributeFilename { file_name } => {
+                            Some(file_name.to_string())
+                        }
+                    },
+                    _ => None,
+                })
+                .nth(0),
+        })
+    }
+
     fn to_input_location(&self) -> Option<tl::enums::InputFileLocation> {
         self.document.document.as_ref().and_then(|p| match p {
             tl::enums::Document::Empty(_) => None,
