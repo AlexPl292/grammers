@@ -427,6 +427,7 @@ impl Message {
         }
     }
 
+    /// Get photo attached to the message if any.
     pub fn photo(&self) -> Option<Photo> {
         if let Media::Photo(photo) = self.media()? {
             return Some(photo);

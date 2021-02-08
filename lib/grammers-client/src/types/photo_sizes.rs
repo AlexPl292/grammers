@@ -17,7 +17,7 @@ pub enum PhotoSize {
 }
 
 impl PhotoSize {
-    pub fn make_from(
+    pub(crate) fn make_from(
         size: &tl::enums::PhotoSize,
         photo: &tl::types::Photo,
         client: ClientHandle,
@@ -59,6 +59,7 @@ impl PhotoSize {
         }
     }
 
+    /// Size of the photo thumb
     pub fn size(&self) -> usize {
         match self {
             PhotoSize::Empty(_) => 0,
@@ -76,6 +77,7 @@ impl PhotoSize {
         }
     }
 
+    /// Download the photo thumb into the defined location
     pub async fn download(&self, path: &Path) {
         match self {
             PhotoSize::Empty(_) => {
@@ -261,6 +263,7 @@ pub struct PathSize {
 }
 
 pub trait VecExt {
+    /// Helper method to get the largest photo thumb
     fn largest(&self) -> Option<&PhotoSize>;
 }
 

@@ -70,6 +70,7 @@ impl Photo {
         }
     }
 
+    /// Get photo thumbs.
     pub fn thumbs(&self) -> Vec<PhotoSize> {
         use tl::enums::Photo as P;
 
