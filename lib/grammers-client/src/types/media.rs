@@ -77,6 +77,13 @@ impl Document {
         })
     }
 
+    pub fn id(&self) -> i64 {
+        match self.document.document.as_ref().unwrap() {
+            tl::enums::Document::Empty(doc) => doc.id,
+            tl::enums::Document::Document(doc) => doc.id,
+        }
+    }
+
     fn to_input_location(&self) -> Option<tl::enums::InputFileLocation> {
         self.document.document.as_ref().and_then(|p| match p {
             tl::enums::Document::Empty(_) => None,
