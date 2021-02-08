@@ -92,7 +92,7 @@ impl PhotoSize {
                 };
                 size.client
                     .clone()
-                    .download_media_at_location(input_location, path)
+                    .download_media_at_location(input_location.into(), path)
                     .await
                     .unwrap();
             }

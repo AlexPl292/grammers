@@ -31,11 +31,8 @@ impl DownloadIter {
         DownloadIter::new_from_file_location(client, media.to_input_location().unwrap())
     }
 
-    fn new_from_location(
-        client: &ClientHandle,
-        location: tl::types::InputPhotoFileLocation,
-    ) -> Self {
-        DownloadIter::new_from_file_location(client, location.into())
+    fn new_from_location(client: &ClientHandle, location: tl::enums::InputFileLocation) -> Self {
+        DownloadIter::new_from_file_location(client, location)
     }
 
     fn new_from_file_location(
@@ -155,7 +152,7 @@ impl ClientHandle {
 
     pub(crate) async fn download_media_at_location<P: AsRef<Path>>(
         &mut self,
-        media: tl::types::InputPhotoFileLocation,
+        media: tl::enums::InputFileLocation,
         path: P,
     ) -> Result<(), io::Error> {
         let mut download = DownloadIter::new_from_location(self, media);

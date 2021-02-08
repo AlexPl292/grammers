@@ -10,10 +10,17 @@ use crate::ClientHandle;
 use grammers_tl_types as tl;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
+use std::path::Path;
 
 #[derive(Clone)]
 pub struct Photo {
     photo: tl::types::MessageMediaPhoto,
+    client: ClientHandle,
+}
+
+#[derive(Clone)]
+pub struct Document {
+    document: tl::types::MessageMediaDocument,
     client: ClientHandle,
 }
 
@@ -26,7 +33,46 @@ pub struct Uploaded {
 #[non_exhaustive]
 pub enum Media {
     Photo(Photo),
+    Document(Document),
     Uploaded(Uploaded),
+}
+
+impl Document {
+    pub(crate) fn from_media(
+        document: tl::types::MessageMediaDocument,
+        client: ClientHandle,
+    ) -> Self {
+        Self { document, client }
+    }
+
+    pub async fn download(&mut self, path: &Path) {
+        match &self.document.document {
+            Some(_) => {
+                if let Some(location) = self.to_input_location() {
+                    self.client
+                        .download_media_at_location(location, path)
+                        .await
+                        .unwrap();
+                }
+            }
+            None => (),
+        }
+    }
+
+    fn to_input_location(&self) -> Option<tl::enums::InputFileLocation> {
+        self.document.document.as_ref().and_then(|p| match p {
+            tl::enums::Document::Empty(_) => None,
+            tl::enums::Document::Document(doc) => Some(
+                tl::types::InputDocumentFileLocation {
+                    id: doc.id,
+                    access_hash: doc.access_hash,
+                    file_reference: doc.file_reference.clone(),
+                    thumb_size: String::new(),
+                }
+                .into(),
+            ),
+        })
+    }
 }
 
 impl Photo {
@@ -102,6 +148,18 @@ impl PartialEq for Photo {
     }
 }
 
+impl Debug for Document {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.document)
+    }
+}
+
+impl PartialEq for Document {
+    fn eq(&self, other: &Self) -> bool {
+        self.document == other.document
+    }
+}
+
 impl Uploaded {
     pub(crate) fn from_raw(input_file: tl::enums::InputFile) -> Self {
         Self { input_file }
@@ -126,7 +184,7 @@ impl Media {
             M::Geo(_) => None,
             M::Contact(_) => None,
             M::Unsupported => None,
-            M::Document(_) => None,
+            M::Document(document) => Some(Self::Document(Document::from_media(document, client))),
             M::WebPage(_) => None,
             M::Venue(_) => None,
             M::Game(_) => None,
@@ -141,6 +199,7 @@ impl Media {
         match self {
             Media::Photo(photo) => photo.to_input_location(),
             Media::Uploaded(_) => None,
+            Media::Document(doc) => doc.to_input_location(),
         }
     }
 }
