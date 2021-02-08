@@ -45,11 +45,12 @@ impl Document {
         Self { document, client }
     }
 
-    pub async fn download(&mut self, path: &Path) {
+    pub async fn download(&self, path: &Path) {
         match &self.document.document {
             Some(_) => {
                 if let Some(location) = self.to_input_location() {
                     self.client
+                        .clone()
                         .download_media_at_location(location, path)
                         .await
                         .unwrap();
